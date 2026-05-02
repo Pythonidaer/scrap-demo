@@ -8,48 +8,101 @@ import {
 } from '../constants';
 import { imageObjectInnerHtmlEscaped } from './imageObjectRender';
 
+/** html2canvas iframe work can move window + nested scroll containers (see library “Chrome scrolls the parent document”). */
+function snapshotScrollChain(anchor: HTMLElement): { el: HTMLElement; left: number; top: number }[] {
+  const chain: { el: HTMLElement; left: number; top: number }[] = [];
+  let el: HTMLElement | null = anchor;
+  while (el) {
+    chain.push({ el, left: el.scrollLeft, top: el.scrollTop });
+    el = el.parentElement;
+  }
+  return chain;
+}
+
+function restoreScrollChain(
+  chain: { el: HTMLElement; left: number; top: number }[],
+  win: { x: number; y: number },
+): void {
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const { el, left, top } = chain[i];
+    el.scrollLeft = left;
+    el.scrollTop = top;
+  }
+  window.scrollTo(win.x, win.y);
+}
+
 /**
  * Rasterize the page at native layout size, then letterbox onto a fixed 816×1056 canvas
  * with uniform scale (never non-uniform stretch, which skews images).
+ *
+ * Captures an off-screen clone so the visible editor never resets zoom/transform (no flicker).
  */
 export async function rasterizePageElement(pageEl: HTMLElement): Promise<HTMLCanvasElement> {
-  const raw = await html2canvas(pageEl, {
-    backgroundColor: '#ffffff',
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    onclone: (_doc, cloned) => {
-      const node = cloned as HTMLElement;
-      node.style.boxShadow = 'none';
-      node.style.margin = '0';
-      node.style.outline = 'none';
-      node.querySelectorAll<HTMLElement>('[data-handle]').forEach((el) => el.remove());
-      node.querySelectorAll<HTMLElement>('[data-scrap-chrome]').forEach((el) => el.remove());
-      node.querySelectorAll<HTMLElement>('[role="group"]').forEach((el) => {
-        el.style.outline = 'none';
-      });
-    },
-  });
+  await document.fonts?.ready;
 
-  const targetW = PAGE_WIDTH;
-  const targetH = PAGE_HEIGHT;
-  const u = Math.min(targetW / raw.width, targetH / raw.height);
-  const dw = Math.round(raw.width * u);
-  const dh = Math.round(raw.height * u);
-  const ox = Math.round((targetW - dw) / 2);
-  const oy = Math.round((targetH - dh) / 2);
+  const scrollChain = snapshotScrollChain(pageEl);
+  const winScroll = { x: window.scrollX, y: window.scrollY };
 
-  const out = document.createElement('canvas');
-  out.width = targetW;
-  out.height = targetH;
-  const ctx = out.getContext('2d');
-  if (!ctx) return raw;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, targetW, targetH);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(raw, ox, oy, dw, dh);
-  return out;
+  const holder = document.createElement('div');
+  holder.setAttribute('aria-hidden', 'true');
+  holder.style.cssText = `position:fixed;left:-10000px;top:0;width:${PAGE_WIDTH}px;min-height:${PAGE_HEIGHT}px;overflow:visible;pointer-events:none;`;
+
+  const clone = pageEl.cloneNode(true) as HTMLElement;
+  holder.appendChild(clone);
+  document.body.appendChild(holder);
+
+  try {
+    await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+    const sw = Math.max(PAGE_WIDTH, clone.scrollWidth);
+    const sh = Math.max(PAGE_HEIGHT, clone.scrollHeight);
+    holder.style.width = `${sw}px`;
+    holder.style.minHeight = `${sh}px`;
+
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+
+    const raw = await html2canvas(clone, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      onclone: (_doc, cloned) => {
+        const node = cloned as HTMLElement;
+        node.style.boxShadow = 'none';
+        node.style.margin = '0';
+        node.style.outline = 'none';
+        node.querySelectorAll<HTMLElement>('[data-handle]').forEach((el) => el.remove());
+        node.querySelectorAll<HTMLElement>('[data-scrap-chrome]').forEach((el) => el.remove());
+        node.querySelectorAll<HTMLElement>('[role="group"]').forEach((el) => {
+          el.style.outline = 'none';
+        });
+      },
+    });
+
+    const targetW = PAGE_WIDTH;
+    const targetH = PAGE_HEIGHT;
+    const u = Math.min(targetW / raw.width, targetH / raw.height);
+    const dw = Math.round(raw.width * u);
+    const dh = Math.round(raw.height * u);
+    const ox = Math.round((targetW - dw) / 2);
+    const oy = Math.round((targetH - dh) / 2);
+
+    const out = document.createElement('canvas');
+    out.width = targetW;
+    out.height = targetH;
+    const ctx = out.getContext('2d');
+    if (!ctx) return raw;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetW, targetH);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(raw, ox, oy, dw, dh);
+    return out;
+  } finally {
+    holder.remove();
+    restoreScrollChain(scrollChain, winScroll);
+    requestAnimationFrame(() => restoreScrollChain(scrollChain, winScroll));
+  }
 }
 
 function escapeHtml(s: string): string {
@@ -118,7 +171,7 @@ export function buildStandaloneHtml(objects: ScrapObject[]): string {
       return `<div class="el" style="${escapeAttr(wrap)}"><div class="t" style="${tStyle}">${inner}</div></div>`;
     }
     const i = o as ImageObject;
-    const src = escapeHtml(i.originalSrc ?? i.src);
+    const src = i.originalSrc ?? i.src;
     return `<div class="el" style="${escapeAttr(wrap)}">${imageObjectInnerHtmlEscaped(src, i)}</div>`;
   });
 

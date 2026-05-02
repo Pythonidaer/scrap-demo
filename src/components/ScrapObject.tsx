@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import type { ImageObject, ScrapObject, TextObject } from '../types/scrapbook';
 import { normalizeRotation, theme, TEXT_LINE_HEIGHT, TEXT_OBJECT_PADDING } from '../constants';
 import { applyResize, boxCenter, type ResizeHandle } from '../utils/geometry';
-import { imageObjectBoxStyle, imageObjectImgStyle } from '../utils/imageObjectRender';
+import { imageObjectBoxStyle, imageObjectPaintStyle } from '../utils/imageObjectRender';
 
 const HANDLE = 8;
 const CONNECTOR_HEIGHT = 28;
@@ -378,7 +378,7 @@ function ImageContent({ o }: { o: ImageObject }) {
   const src = o.originalSrc ?? o.src;
   return (
     <div style={imageObjectBoxStyle()}>
-      <img src={src} alt="" draggable={false} style={imageObjectImgStyle(o)} />
+      <div style={imageObjectPaintStyle(o, src)} aria-hidden />
     </div>
   );
 }

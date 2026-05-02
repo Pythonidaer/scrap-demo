@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HeaderBar } from './components/HeaderBar';
 import { Toolbar } from './components/Toolbar';
 import { RightPanel } from './components/RightPanel';
@@ -53,6 +53,16 @@ export function App() {
   );
 
   const selected = objects.find((o) => o.id === selectedId) ?? null;
+
+  const zoomSlotSize = useMemo(() => {
+    let w = PAGE_WIDTH;
+    let h = PAGE_HEIGHT;
+    for (const o of objects) {
+      w = Math.max(w, o.x + o.width);
+      h = Math.max(h, o.y + o.height);
+    }
+    return { w, h };
+  }, [objects]);
 
   const runExport = useCallback(async (kind: 'png' | 'pdf') => {
     const el = pageRef.current;
@@ -129,36 +139,57 @@ export function App() {
               if (e.target === e.currentTarget) setSelectedId(null);
             }}
           >
-            <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+            {/* Sized to scaled page so scroll/flex clipping matches what you see at any zoom */}
+            <div
+              className="page-zoom-slot"
+              style={{
+                width: zoomSlotSize.w * zoom,
+                minHeight: zoomSlotSize.h * zoom,
+                flexShrink: 0,
+                position: 'relative',
+                overflow: 'visible',
+              }}
+            >
               <div
-                ref={pageRef}
-                className="page"
-                data-page-root
-                role="region"
-                aria-label="Scrapbook page"
                 style={{
-                  position: 'relative',
                   width: PAGE_WIDTH,
                   height: PAGE_HEIGHT,
-                  background: '#fff',
-                  boxShadow: '0 12px 48px rgba(0,0,0,0.35)',
-                }}
-                onPointerDown={(e) => {
-                  if (e.target === e.currentTarget) setSelectedId(null);
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'top left',
+                  overflow: 'visible',
                 }}
               >
-                {sorted.map((o) => (
-                  <ScrapObject
-                    key={o.id}
-                    object={o}
-                    selected={selectedId === o.id}
-                    toPage={toPage}
-                    onSelect={setSelectedId}
-                    onGestureStart={onGestureStart}
-                    onGestureEnd={commitAfterSilentGesture}
-                    patchSilent={patchObjectSilent}
-                  />
-                ))}
+                <div
+                  ref={pageRef}
+                  className="page"
+                  data-page-root
+                  role="region"
+                  aria-label="Scrapbook page"
+                  style={{
+                    position: 'relative',
+                    width: PAGE_WIDTH,
+                    height: PAGE_HEIGHT,
+                    background: '#fff',
+                    boxShadow: '0 12px 48px rgba(0,0,0,0.35)',
+                    overflow: 'visible',
+                  }}
+                  onPointerDown={(e) => {
+                    if (e.target === e.currentTarget) setSelectedId(null);
+                  }}
+                >
+                  {sorted.map((o) => (
+                    <ScrapObject
+                      key={o.id}
+                      object={o}
+                      selected={selectedId === o.id}
+                      toPage={toPage}
+                      onSelect={setSelectedId}
+                      onGestureStart={onGestureStart}
+                      onGestureEnd={commitAfterSilentGesture}
+                      patchSilent={patchObjectSilent}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
