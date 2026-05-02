@@ -25,7 +25,7 @@ const FIELD_GRID_GAP = 6;
 const inputStyle: CSSProperties = {
   width: '100%',
   padding: '6px 8px',
-  borderRadius: 4,
+  borderRadius: 6,
   border: `1px solid ${panel.inputBorder}`,
   background: panel.inputBg,
   color: panel.title,
@@ -37,8 +37,28 @@ const selectStyle: CSSProperties = {
   cursor: 'pointer',
 };
 
-function SectionTitle({ children }: { children: string }) {
-  return <h3 className="panel-section-title">{children}</h3>;
+function SectionTitle({
+  children,
+  id,
+  sentenceCase,
+}: {
+  children: string;
+  id?: string;
+  /** Title case (e.g. Color) instead of all-caps */
+  sentenceCase?: boolean;
+}) {
+  return (
+    <h3
+      className={
+        sentenceCase
+          ? 'panel-section-title panel-section-title--sentence'
+          : 'panel-section-title'
+      }
+      id={id}
+    >
+      {children}
+    </h3>
+  );
 }
 
 function FieldLabel({ children, htmlFor }: { children: string; htmlFor?: string }) {
@@ -58,7 +78,7 @@ function PanelHeader({ kind }: { kind: 'Text' | 'Image' }) {
       >
         Properties
       </h2>
-      <p style={{ margin: 0, fontSize: 12, color: panel.mutedSmall, marginTop: 4 }}>{kind} object</p>
+      <p style={{ margin: 0, fontSize: 12, color: panel.mutedSmall, marginTop: 4 }}>{kind}</p>
     </header>
   );
 }
@@ -132,22 +152,37 @@ function CommonShapeSections({
 
       <section style={{ marginTop: SECTION_MARGIN_TOP }}>
         <SectionTitle>Rotation</SectionTitle>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-          <div style={{ flex: '0 0 76px' }}>
-            <FieldLabel htmlFor={`${o.id}-rot-num`}>Rotation (degrees)</FieldLabel>
-            <input
-              id={`${o.id}-rot-num`}
-              type="number"
-              style={inputStyle}
-              min={-180}
-              max={180}
-              value={Math.round(o.rotation)}
-              onChange={(e) =>
-                patch(o.id, { rotation: normalizeRotation(Number(e.target.value) || 0) })
-              }
-            />
-          </div>
-          <div style={{ flex: 1, minWidth: 0, paddingTop: 18 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '54px 1fr',
+            columnGap: 8,
+            rowGap: 4,
+            alignItems: 'center',
+          }}
+        >
+          <input
+            id={`${o.id}-rot-num`}
+            type="number"
+            style={{ ...inputStyle, width: '100%', gridColumn: 1, gridRow: 1 }}
+            min={-180}
+            max={180}
+            value={Math.round(o.rotation)}
+            aria-label="Rotation"
+            aria-describedby={`${o.id}-rot-degrees-hint`}
+            onChange={(e) =>
+              patch(o.id, { rotation: normalizeRotation(Number(e.target.value) || 0) })
+            }
+          />
+          <div
+            style={{
+              gridColumn: 2,
+              gridRow: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
             <input
               type="range"
               min={-180}
@@ -160,8 +195,21 @@ function CommonShapeSections({
               style={{
                 width: '100%',
                 accentColor: theme.accent,
+                verticalAlign: 'middle',
               }}
             />
+          </div>
+          <div
+            id={`${o.id}-rot-degrees-hint`}
+            style={{
+              gridColumn: 1,
+              gridRow: 2,
+              fontSize: 10,
+              color: panel.mutedSmall,
+              lineHeight: 1.3,
+            }}
+          >
+            Degrees
           </div>
         </div>
       </section>
@@ -189,7 +237,7 @@ export function RightPanel({ selected, patchObject }: Props) {
 
     const fmtBtn = (active: boolean): CSSProperties => ({
       padding: '8px 0',
-      borderRadius: 4,
+      borderRadius: 6,
       border: `1px solid ${panel.inputBorder}`,
       cursor: 'pointer',
       fontSize: 15,
@@ -208,7 +256,9 @@ export function RightPanel({ selected, patchObject }: Props) {
 
         <section style={{ marginTop: SECTION_MARGIN_TOP }}>
           <SectionTitle>Font</SectionTitle>
-          <FieldLabel htmlFor={`${o.id}-font-family`}>Font family</FieldLabel>
+          <label htmlFor={`${o.id}-font-family`} className="sr-only">
+            Font family
+          </label>
           <select
             id={`${o.id}-font-family`}
             style={selectStyle}
@@ -222,13 +272,36 @@ export function RightPanel({ selected, patchObject }: Props) {
             ))}
           </select>
           <div style={{ marginTop: 8 }}>
-            <FieldLabel htmlFor={`${o.id}-font-size`}>{`Size (${o.fontSize}px)`}</FieldLabel>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                marginBottom: 4,
+              }}
+            >
+              <span id={`${o.id}-font-size-lbl`} style={{ fontSize: 12, color: panel.label }}>
+                Size
+              </span>
+              <span
+                style={{
+                  fontSize: 12,
+                  color: panel.title,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+                aria-hidden
+              >
+                {o.fontSize}px
+              </span>
+            </div>
             <input
               id={`${o.id}-font-size`}
               type="range"
               min={8}
               max={124}
               value={o.fontSize}
+              aria-labelledby={`${o.id}-font-size-lbl`}
+              aria-valuetext={`${o.fontSize} pixels`}
               onChange={(e) =>
                 patchObject(o.id, { fontSize: clamp(Number(e.target.value), 8, 124) })
               }
@@ -286,7 +359,7 @@ export function RightPanel({ selected, patchObject }: Props) {
         </section>
 
         <section style={{ marginTop: SECTION_MARGIN_TOP }}>
-          <SectionTitle>Color</SectionTitle>
+          <SectionTitle sentenceCase>Color</SectionTitle>
           <div style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
             <input
               id={`${o.id}-color-picker`}
@@ -299,24 +372,24 @@ export function RightPanel({ selected, patchObject }: Props) {
                 height: 34,
                 padding: 0,
                 border: `1px solid ${panel.inputBorder}`,
-                borderRadius: 4,
+                borderRadius: 6,
                 cursor: 'pointer',
                 flexShrink: 0,
                 background: panel.inputBg,
               }}
             />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <FieldLabel htmlFor={`${o.id}-color-value`}>CSS color value</FieldLabel>
-              <input
-                id={`${o.id}-color-value`}
-                type="text"
-                style={{ ...inputStyle, width: '100%' }}
-                value={o.color}
-                onChange={(e) => patchObject(o.id, { color: e.target.value })}
-                spellCheck={false}
-                autoComplete="off"
-              />
-            </div>
+            <label htmlFor={`${o.id}-color-value`} className="sr-only">
+              CSS color value
+            </label>
+            <input
+              id={`${o.id}-color-value`}
+              type="text"
+              style={{ ...inputStyle, flex: 1, width: 'auto', minWidth: 0 }}
+              value={o.color}
+              onChange={(e) => patchObject(o.id, { color: e.target.value })}
+              spellCheck={false}
+              autoComplete="off"
+            />
           </div>
         </section>
       </aside>

@@ -1,6 +1,11 @@
-# Build and deploy to GitHub Pages (Settings → Pages → Source: GitHub Actions).
-# For a project site: https://<user>.github.io/<repo>/
-# For a user/org site (repo named <user>.github.io): set BASE_PATH to / only.
+# Deploy to GitHub Pages
+#
+# REQUIRED (fixes "Failed to create deployment (status: 404)"):
+#   Repo → Settings → Pages → Build and deployment → Source: GitHub Actions
+#   (If Source is set to a branch e.g. gh-pages, deploy-pages will fail.)
+#
+# Project site URL: https://<user>.github.io/<repo>/
+# User/org site (*.github.io repo): BASE_PATH is set to / by the workflow.
 
 name: Deploy to GitHub Pages
 
@@ -24,9 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/configure-pages@v5
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Set BASE_PATH for GitHub Pages
@@ -40,6 +47,7 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

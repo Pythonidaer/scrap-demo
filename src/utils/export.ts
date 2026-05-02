@@ -23,6 +23,11 @@ export async function rasterizePageElement(pageEl: HTMLElement): Promise<HTMLCan
       node.style.boxShadow = 'none';
       node.style.margin = '0';
       node.style.outline = 'none';
+      node.querySelectorAll<HTMLElement>('[data-handle]').forEach((el) => el.remove());
+      node.querySelectorAll<HTMLElement>('[data-scrap-chrome]').forEach((el) => el.remove());
+      node.querySelectorAll<HTMLElement>('[role="group"]').forEach((el) => {
+        el.style.outline = 'none';
+      });
     },
   });
 

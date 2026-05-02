@@ -29,10 +29,9 @@ export function App() {
 
   const [selectedId, setSelectedId] = useState<string | null>(DEFAULT_TEXT_OBJECT_ID);
   const [zoom, setZoom] = useState(1);
-  const [exporting, setExporting] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
 
   const pageRef = useRef<HTMLDivElement | null>(null);
-  const zoomWrapRef = useRef<HTMLDivElement | null>(null);
   const objectsRef = useRef(objects);
   useEffect(() => {
     objectsRef.current = objects;
@@ -55,33 +54,18 @@ export function App() {
 
   const selected = objects.find((o) => o.id === selectedId) ?? null;
 
-  const runExport = useCallback(
-    async (kind: 'png' | 'pdf') => {
-      const el = pageRef.current;
-      const wrap = zoomWrapRef.current;
-      if (!el || !wrap) return;
-      const prevSelected = selectedId;
-      const prevTransform = wrap.style.transform;
-      const prevTransition = wrap.style.transition;
-      setExporting(true);
-      setSelectedId(null);
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
-      wrap.style.transition = 'none';
-      wrap.style.transform = 'scale(1)';
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      try {
-        const canvas = await rasterizePageElement(el);
-        if (kind === 'png') await downloadPngFromCanvas(canvas, 'scrap-demo.png');
-        else await downloadPdfFromCanvas(canvas, 'scrap-demo.pdf');
-      } finally {
-        wrap.style.transform = prevTransform;
-        wrap.style.transition = prevTransition;
-        setExporting(false);
-        setSelectedId(prevSelected);
-      }
-    },
-    [selectedId],
-  );
+  const runExport = useCallback(async (kind: 'png' | 'pdf') => {
+    const el = pageRef.current;
+    if (!el) return;
+    setExportBusy(true);
+    try {
+      const canvas = await rasterizePageElement(el);
+      if (kind === 'png') await downloadPngFromCanvas(canvas, 'scrap-demo.png');
+      else await downloadPdfFromCanvas(canvas, 'scrap-demo.pdf');
+    } finally {
+      setExportBusy(false);
+    }
+  }, []);
 
   const onHtml = useCallback(() => {
     const blob = new Blob([buildStandaloneHtml(objects)], { type: 'text/html;charset=utf-8' });
@@ -136,7 +120,7 @@ export function App() {
           id="scrapbook-main"
           className="app-main-area"
           aria-label="Scrapbook editor canvas"
-          aria-busy={exporting}
+          aria-busy={exportBusy}
         >
           <div
             className="app-canvas-scroll"
@@ -145,7 +129,7 @@ export function App() {
               if (e.target === e.currentTarget) setSelectedId(null);
             }}
           >
-            <div ref={zoomWrapRef} style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+            <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
               <div
                 ref={pageRef}
                 className="page"
@@ -167,8 +151,7 @@ export function App() {
                   <ScrapObject
                     key={o.id}
                     object={o}
-                    selected={!exporting && selectedId === o.id}
-                    exportChromeHidden={exporting}
+                    selected={selectedId === o.id}
                     toPage={toPage}
                     onSelect={setSelectedId}
                     onGestureStart={onGestureStart}

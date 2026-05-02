@@ -14,7 +14,6 @@ const ROTATE_TOP = CONNECTOR_TOP + HANDLE;
 type Props = {
   object: ScrapObject;
   selected: boolean;
-  exportChromeHidden: boolean;
   toPage: (clientX: number, clientY: number) => { x: number; y: number };
   onSelect: (id: string) => void;
   onGestureStart: () => ScrapObject[];
@@ -29,7 +28,6 @@ function deg(a: { x: number; y: number }, b: { x: number; y: number }): number {
 export function ScrapObject({
   object: o,
   selected,
-  exportChromeHidden,
   toPage,
   onSelect,
   onGestureStart,
@@ -136,7 +134,7 @@ export function ScrapObject({
     window.addEventListener('pointerup', up);
   };
 
-  const showChrome = selected && !exportChromeHidden;
+  const showChrome = selected;
 
   const ariaLabel =
     o.type === 'text'
@@ -210,6 +208,7 @@ export function ScrapObject({
       {showChrome && (
         <>
           <div
+            data-scrap-chrome="1"
             aria-hidden
             style={{
               position: 'absolute',
